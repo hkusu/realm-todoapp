@@ -20,12 +20,12 @@ import de.greenrobot.event.EventBus;
 import io.realm.Realm;
 
 public class MainFragment extends Fragment {
-
     @Bind(R.id.editText) EditText mEditText;
     @Bind(R.id.button)   Button   mButton;
     @Bind(R.id.textView) TextView mTextView;
     @Bind(R.id.listView) ListView mListView;
 
+    private Realm mRealm;
     private TodoModel mTodoModel;
     private TodoListAdapter mTodoListAdapter;
 
@@ -35,9 +35,9 @@ public class MainFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Realm realm = Realm.getInstance(getActivity());
+        mRealm = Realm.getInstance(getActivity());
         EventBus eventBus = EventBus.getDefault();
-        mTodoModel = new TodoModel(realm, eventBus);
+        mTodoModel = new TodoModel(getActivity(), mRealm, eventBus);
     }
 
     @Override
@@ -82,6 +82,12 @@ public class MainFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         ButterKnife.unbind(this); // ButterKnife
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mRealm.close();
     }
 
     @SuppressWarnings("unused")
