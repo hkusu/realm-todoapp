@@ -8,8 +8,8 @@ public class MainApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        // 起動時に Realm のデータを削除(ファイル毎)
-        Realm.deleteRealmFile(getApplicationContext());
+        // 開発時：起動時に Realm のデータを削除(ファイル毎)
+        //Realm.deleteRealmFile(getApplicationContext());
     }
 
     @Override
