@@ -16,11 +16,6 @@ public class TodoEntity extends RealmObject {
     public TodoEntity() {
     }
 
-    public TodoEntity(int id, String text) {
-        this.id = id;
-        this.text = text;
-    }
-
     public int getId() {
         return id;
     }
