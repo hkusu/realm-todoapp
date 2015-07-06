@@ -1,7 +1,5 @@
 package io.github.hkusu.realmapp;
 
-import android.text.Editable;
-
 import io.realm.RealmObject;
 import io.realm.annotations.PrimaryKey;
 

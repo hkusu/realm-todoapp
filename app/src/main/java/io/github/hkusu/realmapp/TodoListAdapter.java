@@ -1,7 +1,6 @@
 package io.github.hkusu.realmapp;
 
 import android.content.Context;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,7 +13,6 @@ import java.util.List;
 import butterknife.Bind;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
-import io.realm.Realm;
 
 public class TodoListAdapter extends ArrayAdapter<TodoEntity> {
     //private Context mContext;
