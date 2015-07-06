@@ -1,4 +1,4 @@
-package io.github.hkusu.realmapp;
+package io.github.hkusu.realmtodoapp;
 
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;

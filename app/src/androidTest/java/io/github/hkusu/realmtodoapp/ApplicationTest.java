@@ -1,4 +1,4 @@
-package io.github.hkusu.realmapp;
+package io.github.hkusu.realmtodoapp;
 
 import android.app.Application;
 import android.test.ApplicationTestCase;

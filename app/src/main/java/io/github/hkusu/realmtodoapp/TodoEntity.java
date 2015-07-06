@@ -1,4 +1,4 @@
-package io.github.hkusu.realmapp;
+package io.github.hkusu.realmtodoapp;
 
 import io.realm.RealmObject;
 import io.realm.annotations.PrimaryKey;
