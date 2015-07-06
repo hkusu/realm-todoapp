@@ -1,12 +1,14 @@
 package io.github.hkusu.realmapp;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
@@ -38,6 +40,8 @@ public class MainFragment extends Fragment {
         mRealm = Realm.getInstance(getActivity());
         EventBus eventBus = EventBus.getDefault();
         mTodoModel = new TodoModel(getActivity(), mRealm, eventBus);
+        // 起動時にソフトウェアキーボードが表示されないようにする
+        getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
     }
 
     @Override
@@ -96,13 +100,7 @@ public class MainFragment extends Fragment {
         if (mEditText.getText().toString().equals("")) {
             return;
         }
-
-        if (!mEditText.getText().toString().equals("")) {
-            TodoEntity todoEntity = new TodoEntity();
-            todoEntity.setText(mEditText.getText().toString());
-            mTodoModel.createOrUpdate(todoEntity);
-            mEditText.setText(null);
-        }
+        registerTodo();
     }
 
     @SuppressWarnings("unused")
@@ -111,14 +109,8 @@ public class MainFragment extends Fragment {
         if (mEditText.getText().toString().equals("")) {
             return true;
         }
-
-        if (event.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
-            if (event.getAction() == KeyEvent.ACTION_UP) {
-                TodoEntity todoEntity = new TodoEntity();
-                todoEntity.setText(mEditText.getText().toString());
-                mTodoModel.createOrUpdate(todoEntity);
-                mEditText.setText(null);
-            }
+        if (event == null || (event.getKeyCode() == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN)) {
+            registerTodo();
         }
         return true;
     }
@@ -126,6 +118,14 @@ public class MainFragment extends Fragment {
     @SuppressWarnings("unused")
     public void onEventMainThread(TodoModelChangedEvent event) {
         updateView();
+    }
+
+    private void registerTodo() {
+        TodoEntity todoEntity = new TodoEntity();
+        todoEntity.setText(mEditText.getText().toString());
+        mTodoModel.createOrUpdate(todoEntity);
+        mEditText.setText(null);
+        ((InputMethodManager)getActivity().getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(mEditText.getWindowToken(), 0);
     }
 
     private void updateView() {
