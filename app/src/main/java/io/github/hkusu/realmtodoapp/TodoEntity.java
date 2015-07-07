@@ -3,18 +3,25 @@ package io.github.hkusu.realmtodoapp;
 import io.realm.RealmObject;
 import io.realm.annotations.PrimaryKey;
 
+/**
+ * Todoデータのデータ構造を表すEntityクラス(RealmObjectクラス)
+ */
 public class TodoEntity extends RealmObject {
-
+    /** プライマリキーの物理名(Todoデータ操作モデルで利用) */
     public static final String PRIMARY_KEY = "id";
+    /** ソートキーの物理名(Todoデータ操作モデルで利用) */
     public static final String SORT_KEY = "id";
 
+    // RealmObjectのカラム定義
     @PrimaryKey
-    private int id;
-    private String text;
+    private int id;      // id
+    private String text; // text
 
-    // RealmObject に於いて 引数なしの Default Constructor を public で定義するがある
+    // RealmObject では引数なしのデフォルトコンストラクタをpublicで定義する必要がある
     public TodoEntity() {
     }
+
+    // 以降 Getter/Setter
 
     public int getId() {
         return id;
