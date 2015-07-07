@@ -37,9 +37,9 @@ public class MainFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mRealm = Realm.getInstance(getActivity());
+        mRealm = Realm.getDefaultInstance();
         EventBus eventBus = EventBus.getDefault();
-        mTodoModel = new TodoModel(getActivity(), mRealm, eventBus);
+        mTodoModel = new TodoModel(mRealm, eventBus);
         // 起動時にソフトウェアキーボードが表示されないようにする
         getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
     }
@@ -91,7 +91,9 @@ public class MainFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        mRealm.close();
+        if (mRealm != null) {
+            mRealm.close();
+        }
     }
 
     @SuppressWarnings("unused")
