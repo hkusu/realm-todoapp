@@ -1,6 +1,5 @@
 package io.github.hkusu.realmtodoapp;
 
-import android.content.Context;
 import android.os.AsyncTask;
 
 import java.util.List;
@@ -10,12 +9,10 @@ import io.realm.Realm;
 import io.realm.RealmResults;
 
 public class TodoModel {
-    private final Context mContext;
     private final Realm mRealm;
     private final EventBus mEventBus;
 
-    public TodoModel(Context context, Realm realm, EventBus eventBus) {
-        mContext = context;
+    public TodoModel(Realm realm, EventBus eventBus) {
         mRealm = realm;
         mEventBus = eventBus;
     }
@@ -39,17 +36,17 @@ public class TodoModel {
         new AsyncTask<TodoEntity, Void, Boolean>() {
             @Override
             protected Boolean doInBackground(TodoEntity ... todoEntities) {
-                Realm realm = Realm.getInstance(mContext);
+                Realm realm = Realm.getDefaultInstance();
                 realm.beginTransaction();
                 try {
                     realm.copyToRealmOrUpdate(todoEntities[0]);
+                    realm.commitTransaction();
                 } catch (Exception e) {
                     realm.cancelTransaction();
-                    realm.close();
                     return false;
+                } finally {
+                    realm.close();
                 }
-                realm.commitTransaction();
-                realm.close();
                 return true;
             }
 
@@ -68,17 +65,17 @@ public class TodoModel {
         new AsyncTask<Integer, Void, Boolean>() {
             @Override
             protected Boolean doInBackground(Integer... ids) {
-                Realm realm = Realm.getInstance(mContext);
+                Realm realm = Realm.getDefaultInstance();
                 realm.beginTransaction();
                 try {
                     realm.where(TodoEntity.class).equalTo(TodoEntity.PRIMARY_KEY, ids[0]).findAll().clear();
+                    realm.commitTransaction();
                 } catch (Exception e) {
                     realm.cancelTransaction();
-                    realm.close();
                     return false;
+                } finally {
+                    realm.close();
                 }
-                realm.commitTransaction();
-                realm.close();
                 return true;
             }
 
