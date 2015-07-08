@@ -45,10 +45,8 @@ public class MainFragment extends Fragment {
         super.onCreate(savedInstanceState);
         // Realmのインスタンを取得
         mRealm = Realm.getDefaultInstance();
-        // EventBusのインスタンスを取得
-        EventBus eventBus = EventBus.getDefault();
         // Todoデータ操作モデルを作成
-        mTodoModel = new TodoModel(mRealm, eventBus);
+        mTodoModel = new TodoModel(mRealm);
         // 起動時にソフトウェアキーボードが表示されないようにする
         getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
     }
@@ -68,8 +66,7 @@ public class MainFragment extends Fragment {
         mTodoListAdapter = new TodoListAdapter(
                 getActivity(),
                 R.layout.adapter_user_list,
-                mTodoModel.get(), // ListViewに表示するデータセット
-                mTodoModel // Todoデータの更新用に渡しておく
+                mTodoModel.get() // ListViewに表示するデータセット
         );
         // ListViewにAdapterをセット
         mListView.setAdapter(mTodoListAdapter);
@@ -145,14 +142,25 @@ public class MainFragment extends Fragment {
     }
 
     /**
-     * EventBusからの通知の購読
+     * EventBusからの通知の購読（Realm上のTodoデータの変更）
      *
-     * @param event EventBusで発行されたイベント
+     * @param event EventBus用のイベントクラス
      */
     @SuppressWarnings("unused")
-    public void onEventMainThread(TodoModelChangedEvent event) {
+    public void onEventMainThread(TodoModel.ChangedEvent event) {
         // 画面の表示を更新
         updateView();
+    }
+
+    /**
+     * EventBusからの通知の購読（削除ボタンの押下）
+     *
+     * @param event EventBus用のイベントクラス
+     */
+    @SuppressWarnings("unused")
+    public void onEventMainThread(TodoListAdapter.RemoveButtonClickedEvent event) {
+        // データ操作モデルを通して削除
+        mTodoModel.removeById(event.getId());
     }
 
     /**

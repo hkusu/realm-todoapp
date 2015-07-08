@@ -14,18 +14,14 @@ import io.realm.RealmResults;
 public class TodoModel {
     /** Realmのインスタンス(データ参照用) */
     private final Realm mRealm;
-    /** EventBusのインスタンス */
-    private final EventBus mEventBus;
 
     /**
      * コンストラクタ
      *
-     * @param realm    Realmのインスタンス
-     * @param eventBus EventBusのインスタンス
+     * @param realm Realmのインスタンス
      */
-    public TodoModel(Realm realm, EventBus eventBus) {
+    public TodoModel(Realm realm) {
         mRealm = realm;
-        mEventBus = eventBus;
     }
 
     /**
@@ -90,7 +86,7 @@ public class TodoModel {
                 super.onPostExecute(isSuccess);
                 if (isSuccess) {
                     // データが変更された旨をEventBusで通知
-                    mEventBus.post(new TodoModelChangedEvent());
+                    EventBus.getDefault().post(new ChangedEvent());
                 }
             }
         }.execute(todoEntity);
@@ -101,7 +97,7 @@ public class TodoModel {
     /**
      * idをキーにTodoデータを削除
      *
-     * @param id 検索対象のTodoデータのid
+     * @param id 削除対象のTodoデータのid
      * @return 成否
      */
     public boolean removeById(int id) {
@@ -134,7 +130,7 @@ public class TodoModel {
                 super.onPostExecute(isSuccess);
                 if (isSuccess) {
                     // データが変更された旨をEventBusで通知
-                    mEventBus.post(new TodoModelChangedEvent());
+                    EventBus.getDefault().post(new ChangedEvent());
                 }
             }
         }.execute(id);
@@ -158,5 +154,12 @@ public class TodoModel {
      */
     private int getMaxId() {
         return mRealm.where(TodoEntity.class).findAll().max(TodoEntity.PRIMARY_KEY).intValue();
+    }
+
+    /**
+     * EventBus用のイベントクラス
+     */
+    public static class ChangedEvent {
+        // 特に渡すデータは無し
     }
 }

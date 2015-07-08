@@ -13,6 +13,7 @@ import java.util.List;
 import butterknife.Bind;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
+import de.greenrobot.event.EventBus;
 
 /**
  * Todoデータ表示用のListAdapterクラス
@@ -23,15 +24,12 @@ public class TodoListAdapter extends ArrayAdapter<TodoEntity> {
     private final LayoutInflater mLayoutInflater;
     /** レイアウトXMLファイルのid */
     private final int mResource;
-    /** Todoデータ操作モデルのインスタンス(Todoデータの更新で利用) */
-    private final TodoModel mTodoModel;
 
-    public TodoListAdapter(Context context, int resource, List<TodoEntity> objects, TodoModel todoModel) {
+    public TodoListAdapter(Context context, int resource, List<TodoEntity> objects) {
         super(context, resource, objects);
         //mContext = context;
         mLayoutInflater = LayoutInflater.from(context);
         mResource = resource;
-        mTodoModel = todoModel;
     }
 
     @Override
@@ -60,12 +58,12 @@ public class TodoListAdapter extends ArrayAdapter<TodoEntity> {
     /**
      * ViewHolder
      */
-    class ViewHolder {
+    static class ViewHolder {
         @Bind(R.id.textView) TextView mTextView;
         @Bind(R.id.button)   Button   mButton;
 
         /** Todoデータのid */
-        int id;
+        private int id;
 
         ViewHolder(View view) {
             ButterKnife.bind(this, view); // ButterKnife
@@ -77,10 +75,29 @@ public class TodoListAdapter extends ArrayAdapter<TodoEntity> {
         @SuppressWarnings("unused")
         @OnClick(R.id.button)
         public void onButtonClick() {
-            // 指定したidのTodoデータを削除(削除結果はEventBusを通じてMainFragmentインスタンへ通知される)
-            mTodoModel.removeById(id);
+            // EventBus経由でボタンが変更された旨を通知
+            EventBus.getDefault().post(new RemoveButtonClickedEvent(id));
+        }
+    }
+
+    /**
+     * EventBus用のイベントクラス
+     */
+    public static class RemoveButtonClickedEvent {
+        /** Todoデータのid */
+        private int id;
+
+        /**
+         * コンストラクタ
+         *
+         * @param id 削除対象のTodoデータのid
+         */
+        public RemoveButtonClickedEvent(int id) {
+            this.id = id;
+        }
+
+        public int getId() {
+            return id;
         }
     }
 }
-
-
