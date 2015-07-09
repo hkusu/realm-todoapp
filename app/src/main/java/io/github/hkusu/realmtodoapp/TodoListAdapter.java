@@ -92,7 +92,7 @@ public class TodoListAdapter extends ArrayAdapter<TodoEntity> {
          *
          * @param id 削除対象のTodoデータのid
          */
-        public RemoveButtonClickedEvent(int id) {
+        private RemoveButtonClickedEvent(int id) {
             this.id = id;
         }
 

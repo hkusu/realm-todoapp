@@ -176,5 +176,7 @@ public class TodoModel {
      */
     public static class ChangedEvent {
         // 特に渡すデータは無し
+        private ChangedEvent() {
+        }
     }
 }
