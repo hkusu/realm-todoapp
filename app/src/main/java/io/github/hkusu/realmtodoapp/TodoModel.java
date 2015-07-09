@@ -9,19 +9,27 @@ import io.realm.Realm;
 import io.realm.RealmResults;
 
 /**
- * Todoデータ操作クラス
+ * Todoデータ操作モデルクラス
  */
 public class TodoModel {
+    /** シングルトンインスタンス */
+    private static TodoModel INSTANCE = new TodoModel();
     /** Realmのインスタンス(データ参照用) */
-    private final Realm mRealm;
+    private Realm mRealm = Realm.getDefaultInstance();
 
     /**
-     * コンストラクタ
+     * 利用元にシングルトンインスタンスを返す
      *
-     * @param realm Realmのインスタンス
+     * @return Todoデータ操作モデルのインスタンス
      */
-    public TodoModel(Realm realm) {
-        mRealm = realm;
+    public static TodoModel getInstance() {
+        return INSTANCE;
+    }
+
+    /**
+     * コンストラクタ *外部からのインスタンス作成は禁止*
+     */
+    private TodoModel() {
     }
 
     /**
@@ -154,6 +162,13 @@ public class TodoModel {
      */
     private int getMaxId() {
         return mRealm.where(TodoEntity.class).findAll().max(TodoEntity.PRIMARY_KEY).intValue();
+    }
+
+    /**
+     * Realmの接続を切断 *以降は利用できなくなるので注意*
+     */
+    public void closeRealm() {
+        mRealm.close();
     }
 
     /**

@@ -19,10 +19,10 @@ public class MainApplication extends Application {
         Realm.setDefaultConfiguration(realmConfiguration);
     }
 
-    /*
     @Override
     public void onTerminate() {
         super.onTerminate();
+        // Realm の接続を閉じる（どのみちアプリケーションが終了するが念のため）
+        TodoModel.getInstance().closeRealm();
     }
-    */
 }

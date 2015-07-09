@@ -19,7 +19,6 @@ import butterknife.ButterKnife;
 import butterknife.OnClick;
 import butterknife.OnEditorAction;
 import de.greenrobot.event.EventBus;
-import io.realm.Realm;
 
 /**
  * 本アプリケーションの画面本体となるFragmentクラス
@@ -30,8 +29,6 @@ public class MainFragment extends Fragment {
     @Bind(R.id.textView) TextView mTextView;
     @Bind(R.id.listView) ListView mListView;
 
-    /** Realmのインスタンス(データ参照用) */
-    private Realm mRealm;
     /** Todoデータ操作モデルのインスタンス */
     private TodoModel mTodoModel;
     /** Todoデータ表示用ListViewにセットするListAdapter */
@@ -43,10 +40,8 @@ public class MainFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Realmのインスタンを取得
-        mRealm = Realm.getDefaultInstance();
-        // Todoデータ操作モデルを作成
-        mTodoModel = new TodoModel(mRealm);
+        // Todoデータ操作モデルのインスタンスを取得
+        mTodoModel = TodoModel.getInstance();
         // 起動時にソフトウェアキーボードが表示されないようにする
         getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
     }
@@ -95,15 +90,6 @@ public class MainFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         ButterKnife.unbind(this); // ButterKnife
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (mRealm != null) {
-            // 接続を閉じる
-            mRealm.close();
-        }
     }
 
     /**
