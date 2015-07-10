@@ -1,6 +1,7 @@
 package io.github.hkusu.realmtodoapp;
 
-import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.HandlerThread;
 
 import java.util.List;
 
@@ -13,9 +14,13 @@ import io.realm.RealmResults;
  */
 public class TodoModel {
     /** シングルトンインスタンス */
-    private static TodoModel INSTANCE = new TodoModel();
-    /** Realmのインスタンス(データ参照用) */
-    private Realm mRealm = Realm.getDefaultInstance();
+    private static final TodoModel INSTANCE = new TodoModel();
+    /** Realmのインスタンス(参照用) */
+    private final Realm mRealmForSelect = Realm.getDefaultInstance();
+    /** Realmのインスタンス(更新用) */
+    private Realm mRealmForUpdate;
+    /** 更新(登録・削除)用スレッドへメッセージを送るためのハンドラ */
+    private final Handler mHandler;
 
     /**
      * 利用元にシングルトンインスタンスを返す
@@ -30,6 +35,11 @@ public class TodoModel {
      * コンストラクタ *外部からのインスタンス作成は禁止*
      */
     private TodoModel() {
+        // 更新用スレッドを起動
+        HandlerThread handlerThread = new HandlerThread("realm");
+        handlerThread.start();
+        // ハンドラを取得
+        mHandler = new Handler(handlerThread.getLooper());
     }
 
     /**
@@ -38,7 +48,7 @@ public class TodoModel {
      * @return TodoデータのList(RealmResult型であるためDBの変更内容は動的に反映される)
      */
     public List<TodoEntity> get() {
-        return mRealm.allObjectsSorted(TodoEntity.class, TodoEntity.SORT_KEY, RealmResults.SORT_ORDER_DESCENDING);
+        return mRealmForSelect.allObjectsSorted(TodoEntity.class, TodoEntity.SORT_KEY, RealmResults.SORT_ORDER_DESCENDING);
     }
 
     /**
@@ -48,7 +58,7 @@ public class TodoModel {
      * @return Todoデータ(1件)
      */
     public TodoEntity getById(int id) {
-        return mRealm.where(TodoEntity.class)
+        return mRealmForSelect.where(TodoEntity.class)
                 .equalTo(TodoEntity.PRIMARY_KEY, id)
                 .findFirst();
     }
@@ -65,39 +75,29 @@ public class TodoModel {
             todoEntity.setId(getMaxId() + 1);
         }
 
-        // 念のため別スレッドで非同期に実行
-        new AsyncTask<TodoEntity, Void, Boolean>() {
+        // 別スレッドで実行
+        mHandler.post(new Runnable() {
             @Override
-            protected Boolean doInBackground(TodoEntity ... todoEntities) {
-                // 現状でRealmインスタンスはスレッドをまたげないため新たにインスタンスを取得
-                Realm realm = Realm.getDefaultInstance();
+            public void run() {
+                // Realmのインスタンスはこのスレッドの中で取得する
+                if (mRealmForUpdate == null) {
+                    mRealmForUpdate = Realm.getDefaultInstance();
+                }
                 // トランザクション開始
-                realm.beginTransaction();
+                mRealmForUpdate.beginTransaction();
                 try {
                     // idにプライマリキーを張ってあるため既に同一idのデータが存在していれば更新となる
-                    realm.copyToRealmOrUpdate(todoEntities[0]);
+                    mRealmForUpdate.copyToRealmOrUpdate(todoEntity);
                     // コミット
-                    realm.commitTransaction();
-                } catch (Exception e) {
-                    // ロールバック
-                    realm.cancelTransaction();
-                    return false;
-                } finally {
-                    // 接続を閉じる
-                    realm.close();
-                }
-                return true;
-            }
-
-            @Override
-            protected void onPostExecute(Boolean isSuccess) {
-                super.onPostExecute(isSuccess);
-                if (isSuccess) {
+                    mRealmForUpdate.commitTransaction();
                     // データが変更された旨をEventBusで通知
                     EventBus.getDefault().post(new ChangedEvent());
+                } catch (Exception e) {
+                    // ロールバック
+                    mRealmForUpdate.cancelTransaction();
                 }
             }
-        }.execute(todoEntity);
+        });
 
         return true;
     }
@@ -108,40 +108,30 @@ public class TodoModel {
      * @param id 削除対象のTodoデータのid
      * @return 成否
      */
-    public boolean removeById(int id) {
-        // 念のため別スレッドで非同期に実行
-        new AsyncTask<Integer, Void, Boolean>() {
+    public boolean removeById(final int id) {
+        // 別スレッドで実行
+        mHandler.post(new Runnable() {
             @Override
-            protected Boolean doInBackground(Integer... ids) {
-                // 現状でRealmインスタンスはスレッドをまたげないため新たにインスタンスを取得
-                Realm realm = Realm.getDefaultInstance();
+            public void run() {
+                // Realmのインスタンスはこのスレッドの中で取得する
+                if (mRealmForUpdate == null) {
+                    mRealmForUpdate = Realm.getDefaultInstance();
+                }
                 // トランザクション開始
-                realm.beginTransaction();
+                mRealmForUpdate.beginTransaction();
                 try {
                     // idに一致するレコードを削除
-                    realm.where(TodoEntity.class).equalTo(TodoEntity.PRIMARY_KEY, ids[0]).findAll().clear();
+                    mRealmForUpdate.where(TodoEntity.class).equalTo(TodoEntity.PRIMARY_KEY, id).findAll().clear();
                     // コミット
-                    realm.commitTransaction();
-                } catch (Exception e) {
-                    // ロールバック
-                    realm.cancelTransaction();
-                    return false;
-                } finally {
-                    // 接続を閉じる
-                    realm.close();
-                }
-                return true;
-            }
-
-            @Override
-            protected void onPostExecute(Boolean isSuccess) {
-                super.onPostExecute(isSuccess);
-                if (isSuccess) {
+                    mRealmForUpdate.commitTransaction();
                     // データが変更された旨をEventBusで通知
                     EventBus.getDefault().post(new ChangedEvent());
+                } catch (Exception e) {
+                    // ロールバック
+                    mRealmForUpdate.cancelTransaction();
                 }
             }
-        }.execute(id);
+        });
 
         return true;
     }
@@ -152,7 +142,7 @@ public class TodoModel {
      * @return 件数
      */
     public int getSize() {
-        return mRealm.allObjects(TodoEntity.class).size();
+        return mRealmForSelect.allObjects(TodoEntity.class).size();
     }
 
     /**
@@ -161,14 +151,15 @@ public class TodoModel {
      * @return 最大id
      */
     private int getMaxId() {
-        return mRealm.where(TodoEntity.class).findAll().max(TodoEntity.PRIMARY_KEY).intValue();
+        return mRealmForSelect.where(TodoEntity.class).findAll().max(TodoEntity.PRIMARY_KEY).intValue();
     }
 
     /**
      * Realmの接続を切断 *以降は利用できなくなるので注意*
      */
     public void closeRealm() {
-        mRealm.close();
+        mRealmForSelect.close();
+        mRealmForUpdate.close();
     }
 
     /**
