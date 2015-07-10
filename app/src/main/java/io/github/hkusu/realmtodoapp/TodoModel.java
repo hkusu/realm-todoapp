@@ -1,8 +1,7 @@
 package io.github.hkusu.realmtodoapp;
 
-import android.os.AsyncTask;
 import android.os.Handler;
-import android.os.Looper;
+import android.os.HandlerThread;
 
 import java.util.List;
 
@@ -10,7 +9,6 @@ import de.greenrobot.event.EventBus;
 import io.realm.Realm;
 import io.realm.RealmResults;
 
-//TODO: ハンドラースレッドを利用する
 //TODO： ラッパークラス&コールバック
 
 /**
@@ -18,11 +16,11 @@ import io.realm.RealmResults;
  */
 public class TodoModel {
     /** シングルトンインスタンス */
-    private static TodoModel INSTANCE = new TodoModel();
+    private static final TodoModel INSTANCE = new TodoModel();
     /** Realmのインスタンス(データ参照用) */
-    private Realm mRealm = Realm.getDefaultInstance();
-    /** 更新系クエリ(登録・削除)用のスレッド */
-    private final LooperThread mLooperThread;
+    private final Realm mRealm = Realm.getDefaultInstance();
+    /** 更新(登録・削除)用スレッドへメッセージを送るためのハンドラ */
+    private final Handler mHandler;
 
     /**
      * 利用元にシングルトンインスタンスを返す
@@ -37,9 +35,11 @@ public class TodoModel {
      * コンストラクタ *外部からのインスタンス作成は禁止*
      */
     private TodoModel() {
-        // UIスレッドとは別のスレッドを開始
-        mLooperThread = new LooperThread();
-        mLooperThread.start();
+        // 更新用スレッドを起動
+        HandlerThread handlerThread = new HandlerThread("other");
+        handlerThread.start();
+        // ハンドラを取得
+        mHandler = new Handler(handlerThread.getLooper());
     }
 
     /**
@@ -76,7 +76,7 @@ public class TodoModel {
         }
 
         // 念のため別スレッドで実行
-        mLooperThread.mHandler.post(new Runnable() {
+        mHandler.post(new Runnable() {
             @Override
             public void run() {
                 // Realmのインスタンスはこのスレッドの中で取得する
@@ -111,7 +111,7 @@ public class TodoModel {
      */
     public boolean removeById(final int id) {
         // 念のため別スレッドで実行
-        mLooperThread.mHandler.post(new Runnable() {
+        mHandler.post(new Runnable() {
             @Override
             public void run() {
                 // Realmのインスタンスはこのスレッドの中で取得する
@@ -169,21 +169,6 @@ public class TodoModel {
     public static class ChangedEvent {
         // 特に渡すデータは無し
         private ChangedEvent() {
-        }
-    }
-
-    /**
-     * Realmに対する更新系クエリ(登録・削除)を処理する為のスレッド
-     */
-    private static class LooperThread extends Thread {
-        public Handler mHandler;
-
-        @Override
-        public void run() {
-            Looper.prepare();
-            // Handlerをこのスレッドの中で起動する
-            mHandler = new Handler();
-            Looper.loop();
         }
     }
 }
