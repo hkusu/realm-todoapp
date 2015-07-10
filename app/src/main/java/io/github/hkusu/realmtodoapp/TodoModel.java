@@ -21,7 +21,7 @@ public class TodoModel {
     private static TodoModel INSTANCE = new TodoModel();
     /** Realmのインスタンス(データ参照用) */
     private Realm mRealm = Realm.getDefaultInstance();
-
+    /** 更新系クエリ(登録・削除)用のスレッド */
     private final LooperThread mLooperThread;
 
     /**
@@ -37,6 +37,7 @@ public class TodoModel {
      * コンストラクタ *外部からのインスタンス作成は禁止*
      */
     private TodoModel() {
+        // UIスレッドとは別のスレッドを開始
         mLooperThread = new LooperThread();
         mLooperThread.start();
     }
@@ -75,43 +76,29 @@ public class TodoModel {
         }
 
         // 念のため別スレッドで実行
-        mLooperThread.mHandler.post(new UpdateRunnable(todoEntity));
-
-        // 参考：AsyncTaskを利用する場合
-        /*
-        new AsyncTask<TodoEntity, Void, Boolean>() {
+        mLooperThread.mHandler.post(new Runnable() {
             @Override
-            protected Boolean doInBackground(TodoEntity ... todoEntities) {
-                // 現状でRealmインスタンスはスレッドをまたげないため新たにインスタンスを取得
+            public void run() {
+                // Realmのインスタンスはこのスレッドの中で取得する
                 Realm realm = Realm.getDefaultInstance();
                 // トランザクション開始
                 realm.beginTransaction();
                 try {
                     // idにプライマリキーを張ってあるため既に同一idのデータが存在していれば更新となる
-                    realm.copyToRealmOrUpdate(todoEntities[0]);
+                    realm.copyToRealmOrUpdate(todoEntity);
                     // コミット
                     realm.commitTransaction();
+                    // データが変更された旨をEventBusで通知
+                    EventBus.getDefault().post(new ChangedEvent());
                 } catch (Exception e) {
                     // ロールバック
                     realm.cancelTransaction();
-                    return false;
                 } finally {
                     // 接続を閉じる
                     realm.close();
                 }
-                return true;
             }
-
-            @Override
-            protected void onPostExecute(Boolean isSuccess) {
-                super.onPostExecute(isSuccess);
-                if (isSuccess) {
-                    // データが変更された旨をEventBusで通知
-                    EventBus.getDefault().post(new ChangedEvent());
-                }
-            }
-        }.execute(todoEntity);
-        */
+        });
 
         return true;
     }
@@ -122,40 +109,31 @@ public class TodoModel {
      * @param id 削除対象のTodoデータのid
      * @return 成否
      */
-    public boolean removeById(int id) {
-
-        new AsyncTask<Integer, Void, Boolean>() {
+    public boolean removeById(final int id) {
+        // 念のため別スレッドで実行
+        mLooperThread.mHandler.post(new Runnable() {
             @Override
-            protected Boolean doInBackground(Integer... ids) {
-                // 現状でRealmインスタンスはスレッドをまたげないため新たにインスタンスを取得
+            public void run() {
+                // Realmのインスタンスはこのスレッドの中で取得する
                 Realm realm = Realm.getDefaultInstance();
                 // トランザクション開始
                 realm.beginTransaction();
                 try {
                     // idに一致するレコードを削除
-                    realm.where(TodoEntity.class).equalTo(TodoEntity.PRIMARY_KEY, ids[0]).findAll().clear();
+                    realm.where(TodoEntity.class).equalTo(TodoEntity.PRIMARY_KEY, id).findAll().clear();
                     // コミット
                     realm.commitTransaction();
+                    // データが変更された旨をEventBusで通知
+                    EventBus.getDefault().post(new ChangedEvent());
                 } catch (Exception e) {
                     // ロールバック
                     realm.cancelTransaction();
-                    return false;
                 } finally {
                     // 接続を閉じる
                     realm.close();
                 }
-                return true;
             }
-
-            @Override
-            protected void onPostExecute(Boolean isSuccess) {
-                super.onPostExecute(isSuccess);
-                if (isSuccess) {
-                    // データが変更された旨をEventBusで通知
-                    EventBus.getDefault().post(new ChangedEvent());
-                }
-            }
-        }.execute(id);
+        });
 
         return true;
     }
@@ -195,7 +173,7 @@ public class TodoModel {
     }
 
     /**
-     * Realmに対する更新系クエリを処理する為のスレッド
+     * Realmに対する更新系クエリ(登録・削除)を処理する為のスレッド
      */
     private static class LooperThread extends Thread {
         public Handler mHandler;
@@ -203,38 +181,9 @@ public class TodoModel {
         @Override
         public void run() {
             Looper.prepare();
+            // Handlerをこのスレッドの中で起動する
             mHandler = new Handler();
             Looper.loop();
-        }
-    }
-
-    private static class UpdateRunnable implements Runnable {
-        private final TodoEntity mTodoEntity;
-
-        public UpdateRunnable(TodoEntity todoEntity) {
-            mTodoEntity = todoEntity;
-        }
-
-        @Override
-        public void run() {
-            Realm realm = Realm.getDefaultInstance();
-
-            // トランザクション開始
-            realm.beginTransaction();
-            try {
-                // idにプライマリキーを張ってあるため既に同一idのデータが存在していれば更新となる
-                realm.copyToRealmOrUpdate(mTodoEntity);
-                // コミット
-                realm.commitTransaction();
-                // データが変更された旨をEventBusで通知
-                EventBus.getDefault().post(new ChangedEvent());
-            } catch (Exception e) {
-                // ロールバック
-                realm.cancelTransaction();
-            } finally {
-                // 接続を閉じる
-                realm.close();
-            }
         }
     }
 }
