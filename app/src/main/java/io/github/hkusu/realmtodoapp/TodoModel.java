@@ -9,16 +9,16 @@ import de.greenrobot.event.EventBus;
 import io.realm.Realm;
 import io.realm.RealmResults;
 
-//TODO： ラッパークラス&コールバック
-
 /**
  * Todoデータ操作モデルクラス
  */
 public class TodoModel {
     /** シングルトンインスタンス */
     private static final TodoModel INSTANCE = new TodoModel();
-    /** Realmのインスタンス(データ参照用) */
-    private final Realm mRealm = Realm.getDefaultInstance();
+    /** Realmのインスタンス(参照用) */
+    private final Realm mRealmForSelect = Realm.getDefaultInstance();
+    /** Realmのインスタンス(更新用) */
+    private Realm mRealmForUpdate;
     /** 更新(登録・削除)用スレッドへメッセージを送るためのハンドラ */
     private final Handler mHandler;
 
@@ -36,7 +36,7 @@ public class TodoModel {
      */
     private TodoModel() {
         // 更新用スレッドを起動
-        HandlerThread handlerThread = new HandlerThread("other");
+        HandlerThread handlerThread = new HandlerThread("realm");
         handlerThread.start();
         // ハンドラを取得
         mHandler = new Handler(handlerThread.getLooper());
@@ -48,7 +48,7 @@ public class TodoModel {
      * @return TodoデータのList(RealmResult型であるためDBの変更内容は動的に反映される)
      */
     public List<TodoEntity> get() {
-        return mRealm.allObjectsSorted(TodoEntity.class, TodoEntity.SORT_KEY, RealmResults.SORT_ORDER_DESCENDING);
+        return mRealmForSelect.allObjectsSorted(TodoEntity.class, TodoEntity.SORT_KEY, RealmResults.SORT_ORDER_DESCENDING);
     }
 
     /**
@@ -58,7 +58,7 @@ public class TodoModel {
      * @return Todoデータ(1件)
      */
     public TodoEntity getById(int id) {
-        return mRealm.where(TodoEntity.class)
+        return mRealmForSelect.where(TodoEntity.class)
                 .equalTo(TodoEntity.PRIMARY_KEY, id)
                 .findFirst();
     }
@@ -75,27 +75,26 @@ public class TodoModel {
             todoEntity.setId(getMaxId() + 1);
         }
 
-        // 念のため別スレッドで実行
+        // 別スレッドで実行
         mHandler.post(new Runnable() {
             @Override
             public void run() {
                 // Realmのインスタンスはこのスレッドの中で取得する
-                Realm realm = Realm.getDefaultInstance();
+                if (mRealmForUpdate == null) {
+                    mRealmForUpdate = Realm.getDefaultInstance();
+                }
                 // トランザクション開始
-                realm.beginTransaction();
+                mRealmForUpdate.beginTransaction();
                 try {
                     // idにプライマリキーを張ってあるため既に同一idのデータが存在していれば更新となる
-                    realm.copyToRealmOrUpdate(todoEntity);
+                    mRealmForUpdate.copyToRealmOrUpdate(todoEntity);
                     // コミット
-                    realm.commitTransaction();
+                    mRealmForUpdate.commitTransaction();
                     // データが変更された旨をEventBusで通知
                     EventBus.getDefault().post(new ChangedEvent());
                 } catch (Exception e) {
                     // ロールバック
-                    realm.cancelTransaction();
-                } finally {
-                    // 接続を閉じる
-                    realm.close();
+                    mRealmForUpdate.cancelTransaction();
                 }
             }
         });
@@ -110,27 +109,26 @@ public class TodoModel {
      * @return 成否
      */
     public boolean removeById(final int id) {
-        // 念のため別スレッドで実行
+        // 別スレッドで実行
         mHandler.post(new Runnable() {
             @Override
             public void run() {
                 // Realmのインスタンスはこのスレッドの中で取得する
-                Realm realm = Realm.getDefaultInstance();
+                if (mRealmForUpdate == null) {
+                    mRealmForUpdate = Realm.getDefaultInstance();
+                }
                 // トランザクション開始
-                realm.beginTransaction();
+                mRealmForUpdate.beginTransaction();
                 try {
                     // idに一致するレコードを削除
-                    realm.where(TodoEntity.class).equalTo(TodoEntity.PRIMARY_KEY, id).findAll().clear();
+                    mRealmForUpdate.where(TodoEntity.class).equalTo(TodoEntity.PRIMARY_KEY, id).findAll().clear();
                     // コミット
-                    realm.commitTransaction();
+                    mRealmForUpdate.commitTransaction();
                     // データが変更された旨をEventBusで通知
                     EventBus.getDefault().post(new ChangedEvent());
                 } catch (Exception e) {
                     // ロールバック
-                    realm.cancelTransaction();
-                } finally {
-                    // 接続を閉じる
-                    realm.close();
+                    mRealmForUpdate.cancelTransaction();
                 }
             }
         });
@@ -144,7 +142,7 @@ public class TodoModel {
      * @return 件数
      */
     public int getSize() {
-        return mRealm.allObjects(TodoEntity.class).size();
+        return mRealmForSelect.allObjects(TodoEntity.class).size();
     }
 
     /**
@@ -153,14 +151,15 @@ public class TodoModel {
      * @return 最大id
      */
     private int getMaxId() {
-        return mRealm.where(TodoEntity.class).findAll().max(TodoEntity.PRIMARY_KEY).intValue();
+        return mRealmForSelect.where(TodoEntity.class).findAll().max(TodoEntity.PRIMARY_KEY).intValue();
     }
 
     /**
      * Realmの接続を切断 *以降は利用できなくなるので注意*
      */
     public void closeRealm() {
-        mRealm.close();
+        mRealmForSelect.close();
+        mRealmForUpdate.close();
     }
 
     /**
