@@ -1,12 +1,17 @@
 package io.github.hkusu.realmtodoapp;
 
 import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Looper;
 
 import java.util.List;
 
 import de.greenrobot.event.EventBus;
 import io.realm.Realm;
 import io.realm.RealmResults;
+
+//TODO: ハンドラースレッドを利用する
+//TODO： ラッパークラス&コールバック
 
 /**
  * Todoデータ操作モデルクラス
@@ -16,6 +21,8 @@ public class TodoModel {
     private static TodoModel INSTANCE = new TodoModel();
     /** Realmのインスタンス(データ参照用) */
     private Realm mRealm = Realm.getDefaultInstance();
+
+    private final LooperThread mLooperThread;
 
     /**
      * 利用元にシングルトンインスタンスを返す
@@ -30,6 +37,8 @@ public class TodoModel {
      * コンストラクタ *外部からのインスタンス作成は禁止*
      */
     private TodoModel() {
+        mLooperThread = new LooperThread();
+        mLooperThread.start();
     }
 
     /**
@@ -65,7 +74,11 @@ public class TodoModel {
             todoEntity.setId(getMaxId() + 1);
         }
 
-        // 念のため別スレッドで非同期に実行
+        // 念のため別スレッドで実行
+        mLooperThread.mHandler.post(new UpdateRunnable(todoEntity));
+
+        // 参考：AsyncTaskを利用する場合
+        /*
         new AsyncTask<TodoEntity, Void, Boolean>() {
             @Override
             protected Boolean doInBackground(TodoEntity ... todoEntities) {
@@ -98,6 +111,7 @@ public class TodoModel {
                 }
             }
         }.execute(todoEntity);
+        */
 
         return true;
     }
@@ -109,7 +123,7 @@ public class TodoModel {
      * @return 成否
      */
     public boolean removeById(int id) {
-        // 念のため別スレッドで非同期に実行
+
         new AsyncTask<Integer, Void, Boolean>() {
             @Override
             protected Boolean doInBackground(Integer... ids) {
@@ -177,6 +191,50 @@ public class TodoModel {
     public static class ChangedEvent {
         // 特に渡すデータは無し
         private ChangedEvent() {
+        }
+    }
+
+    /**
+     * Realmに対する更新系クエリを処理する為のスレッド
+     */
+    private static class LooperThread extends Thread {
+        public Handler mHandler;
+
+        @Override
+        public void run() {
+            Looper.prepare();
+            mHandler = new Handler();
+            Looper.loop();
+        }
+    }
+
+    private static class UpdateRunnable implements Runnable {
+        private final TodoEntity mTodoEntity;
+
+        public UpdateRunnable(TodoEntity todoEntity) {
+            mTodoEntity = todoEntity;
+        }
+
+        @Override
+        public void run() {
+            Realm realm = Realm.getDefaultInstance();
+
+            // トランザクション開始
+            realm.beginTransaction();
+            try {
+                // idにプライマリキーを張ってあるため既に同一idのデータが存在していれば更新となる
+                realm.copyToRealmOrUpdate(mTodoEntity);
+                // コミット
+                realm.commitTransaction();
+                // データが変更された旨をEventBusで通知
+                EventBus.getDefault().post(new ChangedEvent());
+            } catch (Exception e) {
+                // ロールバック
+                realm.cancelTransaction();
+            } finally {
+                // 接続を閉じる
+                realm.close();
+            }
         }
     }
 }
